@@ -22,6 +22,7 @@ package org.openbase.bco.authentication.test;
  * #L%
  */
 
+import java.util.Arrays;
 import org.junit.After;
 import org.junit.AfterClass;
 import static org.junit.Assert.assertArrayEquals;
@@ -95,8 +96,10 @@ public class AuthenticationRegistryTest {
 
         // test if they produce the same result
         try {
-            byte[] passwordHash = loadingRegistry.getCredentials(clientId);
-            assertArrayEquals(registry.getCredentials(clientId), passwordHash);
+            byte[] newHash = loadingRegistry.getCredentials(clientId);
+            byte[] oldHash = registry.getCredentials(clientId);
+            System.out.println("Trying to compare old hash " + Arrays.toString(oldHash) + " and hash from file " + Arrays.toString(newHash));
+            assertArrayEquals(oldHash, newHash);
         } catch (NotAvailableException ex) {
             throw ExceptionPrinter.printHistoryAndReturnThrowable(ex, LOGGER);
         }

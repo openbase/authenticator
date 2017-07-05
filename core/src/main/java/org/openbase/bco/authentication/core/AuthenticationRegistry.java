@@ -22,11 +22,7 @@ package org.openbase.bco.authentication.core;
  * #L%
  */
 import com.google.protobuf.ByteString;
-import com.google.protobuf.CodedInputStream;
-import com.google.protobuf.CodedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
@@ -34,8 +30,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.openbase.bco.authentication.lib.jp.JPCredentialsDirectory;
 import org.openbase.bco.authentication.lib.jp.JPInitializeCredentials;
 import org.openbase.bco.authentication.lib.jp.JPRegistrationMode;
@@ -46,8 +40,9 @@ import org.openbase.jul.exception.InitializationException;
 import org.openbase.jul.exception.NotAvailableException;
 import org.openbase.jul.exception.printer.ExceptionPrinter;
 import org.openbase.jul.exception.printer.LogLevel;
-import org.openbase.jul.processing.JSonObjectFileProcessor;
+import org.openbase.jul.extension.protobuf.processing.ProtoBufFileProcessor;
 import org.slf4j.LoggerFactory;
+import rst.domotic.authentication.LoginCredentialsCollectionType.LoginCredentialsCollection;
 import rst.domotic.authentication.LoginCredentialsType.LoginCredentials;
 
 /**
@@ -59,22 +54,22 @@ public class AuthenticationRegistry {
 
     private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(AuthenticationRegistry.class);
 
-    private static final String FILENAME = "credentials.dat";
+    private static final String FILENAME = "credentials.json";
 
     protected HashMap<String, LoginCredentials> credentials;
 
-    private final JSonObjectFileProcessor<HashMap> fileProcessor;
+    private ProtoBufFileProcessor<LoginCredentialsCollection, LoginCredentialsCollection, LoginCredentialsCollection.Builder> fileProcessor;
     private File file;
 
     private final long startingTime;
 
     public AuthenticationRegistry() {
-        this.fileProcessor = new JSonObjectFileProcessor<>(HashMap.class);
         this.startingTime = System.currentTimeMillis();
     }
 
     public void init() throws InitializationException {
         try {
+            this.fileProcessor = new ProtoBufFileProcessor<>(LoginCredentialsCollection.newBuilder());
             this.file = new File(JPService.getProperty(JPCredentialsDirectory.class).getValue(), FILENAME);
             this.load();
             this.setPermissions();
@@ -158,7 +153,7 @@ public class AuthenticationRegistry {
     }
 
     /**
-     * Loads the credentials from a protobuf binary file.
+     * Loads the credentials from a protobuf JSON file.
      *
      * @throws CouldNotPerformException If the deserialization fails.
      */
@@ -173,31 +168,24 @@ public class AuthenticationRegistry {
         }
 
         credentials = new HashMap<>();
-        try {
-            final CodedInputStream inputStream = CodedInputStream.newInstance(new FileInputStream(file));
+        LoginCredentialsCollection collection = fileProcessor.deserialize(file);
 
-            while (!inputStream.isAtEnd()) {
-                LoginCredentials entry = LoginCredentials.parseFrom(inputStream);
-                credentials.put(entry.getId(), entry);
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(AuthenticationRegistry.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        collection.getElementList().forEach((entry) -> {
+            credentials.put(entry.getId(), entry);
+        });
     }
 
     /**
-     * Stores the credentials in a protobuf binary file.
+     * Stores the credentials in a protobuf JSON file.
      */
     private void save() {
         try {
-            final CodedOutputStream outputStream = CodedOutputStream.newInstance(new FileOutputStream(file));
+            LoginCredentialsCollection collection = LoginCredentialsCollection.newBuilder()
+              .addAllElement(credentials.values())
+              .build();
 
-            for (LoginCredentials entry : credentials.values()) {
-                entry.writeTo(outputStream);
-            }
-
-            outputStream.flush();
-        } catch (IOException ex) {
+            fileProcessor.serialize(collection, file);
+        } catch (CouldNotPerformException ex) {
             ExceptionPrinter.printHistory(ex, LOGGER, LogLevel.ERROR);
         }
     }
