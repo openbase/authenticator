@@ -118,9 +118,9 @@ public class AuthenticatedServiceProcessor {
                     UnitConfig unitConfig = configRetrieval.retrieve(message);
 
 // todo enable again after fixing openbase/bco.authentication#61
-//                    if (unitConfig.getType() == UnitType.UNKNOWN) {
-//                        throw new InvalidStateException("Unit type of received unit config is unknown! Reject request because message seems to be broken.");
-//                    }
+                    if (unitConfig.getType() == UnitType.UNKNOWN) {
+                        throw new InvalidStateException("Unit type of received unit config is unknown! Reject request because message seems to be broken.");
+                    }
 
                     try {
                         if (JPService.getProperty(JPAuthentication.class).getValue()) {
